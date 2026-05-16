@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Article Reader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <style>
@@ -17,12 +17,12 @@
   --hbg:rgba(255,255,255,0.96);
   --sh:0 2px 12px rgba(0,0,0,0.08);
 }
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);height:100vh;height:100dvh;overflow:hidden;position:fixed;width:100%}
 
 /* screens */
-.screen{display:none;flex-direction:column;height:100vh;overflow:hidden}
+.screen{display:none;flex-direction:column;height:100vh;height:100dvh;overflow:hidden}
 .screen.active{display:flex}
-.s-head{flex-shrink:0;background:var(--hbg);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--border);z-index:100;padding-top:env(safe-area-inset-top)}
+.s-head{flex-shrink:0;background:var(--hbg);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--border);z-index:100}
 .s-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:24px 16px}
 
 /* header rows */
