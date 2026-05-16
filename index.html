@@ -318,12 +318,15 @@ function tokenize(text){return esc(text).replace(/\b([a-zA-Z']{2,})\b/g,'<span c
 // ── IndexedDB ──────────────────────────────────────────
 const DB={
   _db:null,
-  open(){return new Promise((res,rej)=>{const r=indexedDB.open('ArticleReader',1);r.onupgradeneeded=e=>{const d=e.target.result;if(!d.objectStoreNames.contains('projects'))d.createObjectStore('projects',{keyPath:'id'})};r.onsuccess=e=>{this._db=e.target.result;res()};r.onerror=()=>rej(r.error)})},
+  open(){return new Promise((res,rej)=>{const r=indexedDB.open('ArticleReader',2);r.onupgradeneeded=e=>{const d=e.target.result;if(!d.objectStoreNames.contains('projects'))d.createObjectStore('projects',{keyPath:'id'});if(!d.objectStoreNames.contains('audio'))d.createObjectStore('audio')};r.onsuccess=e=>{this._db=e.target.result;res()};r.onerror=()=>rej(r.error)})},
   _s(m){return this._db.transaction('projects',m).objectStore('projects')},
   all(){return new Promise((res,rej)=>{const r=this._s('readonly').getAll();r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})},
   get(id){return new Promise((res,rej)=>{const r=this._s('readonly').get(id);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})},
   put(p){return new Promise((res,rej)=>{const r=this._s('readwrite').put(p);r.onsuccess=()=>res();r.onerror=()=>rej(r.error)})},
-  del(id){return new Promise((res,rej)=>{const r=this._s('readwrite').delete(id);r.onsuccess=()=>res();r.onerror=()=>rej(r.error)})}
+  del(id){return new Promise((res,rej)=>{const r=this._s('readwrite').delete(id);r.onsuccess=()=>res();r.onerror=()=>rej(r.error)})},
+  saveAudio(id,blob){return new Promise((res,rej)=>{const tx=this._db.transaction('audio','readwrite');const r=tx.objectStore('audio').put(blob,id);r.onsuccess=()=>res();r.onerror=()=>rej(r.error)})},
+  getAudio(id){return new Promise((res,rej)=>{const tx=this._db.transaction('audio','readonly');const r=tx.objectStore('audio').get(id);r.onsuccess=()=>res(r.result||null);r.onerror=()=>res(null)})},
+  delAudio(id){return new Promise((res,rej)=>{const tx=this._db.transaction('audio','readwrite');tx.objectStore('audio').delete(id);tx.oncomplete=()=>res()})}
 };
 
 // ── App ────────────────────────────────────────────────
@@ -414,6 +417,8 @@ const A={
     this._renderReader();
     this.showScreen('reader');
     p.updatedAt=Date.now();await DB.put(p);
+    const loaded=await this._autoLoadAudio(id);
+    if(loaded)this._toast('🎵 Аудио загружено автоматически');
   },
 
   _renderReader(){
@@ -457,7 +462,21 @@ const A={
     this._au.load();
     document.getElementById('audio-banner').style.display='none';
     this._updateAudioUI();
-    if(this.proj){this.proj.audioFile=file.name;DB.put(this.proj)}
+    if(this.proj){
+      this.proj.audioFile=file.name;
+      DB.put(this.proj);
+      DB.saveAudio(this.proj.id,file).catch(()=>{});
+    }
+  },
+  async _autoLoadAudio(projectId){
+    const blob=await DB.getAudio(projectId);
+    if(!blob)return false;
+    if(this._au.src&&this._au.src.startsWith('blob:'))URL.revokeObjectURL(this._au.src);
+    this._au.src=URL.createObjectURL(blob);
+    this._au.load();
+    document.getElementById('audio-banner').style.display='none';
+    this._updateAudioUI();
+    return true;
   },
   togglePlay(){this._au.paused?this._au.play():this._au.pause()},
   rel(d){this._au.currentTime=Math.max(0,this._au.currentTime+d)},
