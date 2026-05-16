@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Article Reader</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f4f0;--surface:#fff;--border:#e0dfd8;
+  --text:#1c1c1e;--muted:#8e8e93;
+  --accent:#007aff;--accent2:#0051d5;
+  --hi-bg:#fff8dc;--hi-border:#e6c200;
+  --danger:#ff3b30;--ok:#34c759;
+  --r:12px;--r2:8px;
+  --hbg:rgba(255,255,255,0.96);
+  --sh:0 2px 12px rgba(0,0,0,0.08);
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden}
+
+/* screens */
+.screen{display:none;flex-direction:column;height:100vh;overflow:hidden}
+.screen.active{display:flex}
+.s-head{flex-shrink:0;background:var(--hbg);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--border);z-index:100}
+.s-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:24px 16px}
+
+/* header rows */
+.hrow{display:flex;align-items:center;gap:8px;padding:10px 16px}
+.hrow+.hrow{border-top:1px solid var(--border)}
+.htitle{flex:1;font-size:17px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:var(--r2);border:none;cursor:pointer;font-size:14px;font-weight:500;transition:background .15s,transform .1s}
+.btn:active{transform:scale(.97)}
+.btn-p{background:var(--accent);color:#fff}.btn-p:hover{background:var(--accent2)}
+.btn-s{background:#f0f0f5;color:var(--text)}.btn-s:hover{background:#e0e0ea}
+.btn-sm{padding:6px 11px;font-size:13px}
+.btn-ghost{background:none;border:none;color:var(--accent);cursor:pointer;font-size:15px;font-weight:500;padding:8px 10px;border-radius:var(--r2)}
+.btn-ghost:hover{background:rgba(0,122,255,.08)}
+.btn-icon{background:none;border:none;cursor:pointer;font-size:18px;padding:8px;border-radius:50%;color:var(--accent)}
+.btn-icon:hover{background:rgba(0,122,255,.1)}
+
+/* home */
+.home-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 20px}
+.home-hdr h1{font-size:22px;font-weight:700}
+.project-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;max-width:960px;margin:0 auto}
+.pcard{background:var(--surface);border-radius:var(--r);padding:20px;box-shadow:var(--sh);cursor:pointer;transition:transform .15s,box-shadow .15s,border-color .15s;position:relative;border:2px solid transparent}
+.pcard:hover{transform:translateY(-2px);box-shadow:0 4px 20px rgba(0,0,0,.12);border-color:var(--accent)}
+.pcard-name{font-size:17px;font-weight:600;margin-bottom:8px}
+.pcard-meta{font-size:13px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap}
+.pcard-del{position:absolute;top:10px;right:10px;background:none;border:none;cursor:pointer;font-size:15px;color:var(--muted);padding:4px;border-radius:50%;opacity:0;transition:opacity .15s,color .15s}
+.pcard:hover .pcard-del{opacity:1}
+.pcard-del:hover{color:var(--danger)}
+.empty{text-align:center;padding:60px 20px;color:var(--muted);grid-column:1/-1}
+.empty h2{font-size:20px;margin-bottom:8px;font-weight:500}
+.fab{position:fixed;bottom:28px;right:28px;background:var(--accent);color:#fff;border:none;border-radius:50px;padding:14px 22px;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 4px 16px rgba(0,122,255,.35);display:flex;align-items:center;gap:8px;z-index:50;transition:transform .15s,box-shadow .15s}
+.fab:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,122,255,.45)}
+
+/* audio controls */
+.audio-wrap{display:flex;align-items:center;gap:6px;flex:1}
+.abtn{background:none;border:none;cursor:pointer;font-size:20px;color:var(--accent);padding:4px;border-radius:50%;width:34px;height:34px;display:flex;align-items:center;justify-content:center;transition:background .15s}
+.abtn:hover{background:rgba(0,122,255,.1)}
+.abtn.play{font-size:24px;width:38px;height:38px}
+.atime{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;min-width:95px}
+.aprog{flex:1;height:5px;background:var(--border);border-radius:3px;cursor:pointer;position:relative;min-width:40px}
+.aprog-fill{height:100%;background:var(--accent);border-radius:3px;pointer-events:none;width:0%}
+.speed{font-size:13px;color:var(--accent);background:none;border:1px solid var(--accent);border-radius:6px;padding:3px 6px;cursor:pointer}
+
+/* reader */
+.reader-body{max-width:700px;margin:0 auto;padding:28px 16px 80px}
+.para-wrap{margin-bottom:24px;padding:14px 18px;border-radius:var(--r);border-left:4px solid transparent;transition:background .35s,border-color .35s;scroll-margin-top:140px}
+.para-wrap.active{background:var(--hi-bg);border-left-color:var(--hi-border)}
+.para-text{font-family:Georgia,'Times New Roman',serif;font-size:19px;line-height:1.8;color:var(--text)}
+.word{cursor:pointer;border-radius:3px;transition:background .1s}
+.word:hover{background:rgba(0,122,255,.12)}
+.audio-banner{background:#f0f5ff;border:1px solid #c0d0ff;border-radius:var(--r);padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.audio-banner p{font-size:14px;color:#2040a0}
+
+/* timing editor */
+.timing-info{background:#fffbf0;border:1px solid #e6c200;border-radius:var(--r);padding:13px 16px;margin-bottom:16px;font-size:14px;color:#7a5c00;line-height:1.5}
+.tlist{display:flex;flex-direction:column;gap:6px}
+.trow{background:var(--surface);border-radius:var(--r2);padding:11px 14px;display:flex;align-items:center;gap:10px;border:1px solid var(--border)}
+.tnum{font-size:13px;color:var(--muted);font-weight:600;min-width:22px}
+.tprev{flex:1;font-size:14px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:Georgia,serif}
+.tinput{width:74px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:'SF Mono',Menlo,monospace;text-align:center;color:var(--text);background:var(--bg)}
+.tinput:focus{outline:none;border-color:var(--accent);background:#fff}
+.tinput.ok{border-color:var(--ok)}
+.bnow{background:none;border:1px solid var(--accent);color:var(--accent);font-size:12px;padding:5px 8px;border-radius:6px;cursor:pointer;white-space:nowrap;font-weight:500}
+.bnow:hover{background:rgba(0,122,255,.08)}
+.tcount{font-size:13px;color:var(--muted);margin-bottom:12px}
+
+/* word popup */
+#popup{position:fixed;z-index:1000;background:var(--surface);border-radius:var(--r);box-shadow:0 8px 32px rgba(0,0,0,.18);border:1px solid var(--border);width:315px;max-width:calc(100vw - 28px);display:none}
+#popup.on{display:block}
+.pop-hdr{background:#f0f4ff;padding:13px 15px 10px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between}
+.pop-word{font-size:20px;font-weight:700;font-family:Georgia,serif}
+.pop-ipa{font-size:17px;color:var(--muted);margin-top:4px;font-style:italic}
+.pop-x{background:none;border:none;cursor:pointer;font-size:20px;color:var(--muted);line-height:1;padding:0 2px}
+.pop-x:hover{color:var(--text)}
+.pop-body{padding:13px 15px}
+.psec{margin-bottom:11px}.psec:last-child{margin-bottom:0}
+.plabel{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px}
+.ptrans{font-size:17px;font-weight:600}
+.psyns{display:flex;flex-wrap:wrap;gap:5px}
+.chip{background:#f0f4ff;border:1px solid #c0d0ff;color:#2040a0;border-radius:50px;padding:3px 9px;font-size:13px}
+.pcolls{display:flex;flex-direction:column;gap:3px}
+.coll{font-size:14px;padding:1px 0}
+.coll::before{content:'·';color:var(--accent);margin-right:5px;font-weight:700}
+.pop-load{display:flex;align-items:center;justify-content:center;padding:28px;gap:10px;color:var(--muted);font-size:14px}
+.spin{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.pop-err{padding:18px 15px;color:var(--danger);font-size:14px;text-align:center}
+
+/* modal */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:500;align-items:center;justify-content:center;padding:20px}
+.overlay.on{display:flex}
+.modal{background:var(--surface);border-radius:var(--r);padding:26px;max-width:460px;width:100%;box-shadow:0 16px 48px rgba(0,0,0,.2)}
+.modal h2{font-size:19px;margin-bottom:18px}
+
+/* form */
+.fg{margin-bottom:16px}
+.flabel{display:block;font-size:14px;font-weight:500;margin-bottom:5px}
+.finput{width:100%;padding:10px 13px;border:1px solid var(--border);border-radius:var(--r2);font-size:15px;color:var(--text);background:var(--bg);transition:border-color .15s}
+.finput:focus{outline:none;border-color:var(--accent);background:#fff}
+.fhint{font-size:12px;color:var(--muted);margin-top:4px}
+.upload-lbl{display:flex;align-items:center;gap:10px;padding:12px 15px;border:2px dashed var(--border);border-radius:var(--r);cursor:pointer;font-size:15px;color:var(--muted);background:var(--bg);transition:border-color .15s,color .15s;width:100%}
+.upload-lbl:hover{border-color:var(--accent);color:var(--accent)}
+.upload-lbl.ok{border-style:solid;border-color:var(--ok);color:var(--ok)}
+.divider{height:1px;background:var(--border);margin:18px 0}
+.flex{display:flex}.gap8{gap:8px}.gap12{gap:12px}
+
+/* toast */
+@keyframes fadeUp{from{opacity:0;transform:translateX(-50%) translateY(8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+
+/* responsive */
+@media(max-width:600px){
+  .para-text{font-size:17px}
+  .reader-body{padding:16px 10px 60px}
+  .fab{bottom:18px;right:14px}
+  .aprog{display:none}
+  .htitle{font-size:15px}
+}
+@media(min-width:768px){.s-body{padding:28px 24px}}
+</style>
+</head>
+<body>
+
+<!-- HOME -->
+<div id="s-home" class="screen active">
+  <div class="s-head">
+    <div class="home-hdr">
+      <h1>Article Reader</h1>
+      <button class="btn-icon" onclick="A.openSettings()" title="Settings">⚙️</button>
+    </div>
+  </div>
+  <div class="s-body">
+    <div id="proj-list" class="project-grid"></div>
+  </div>
+  <button class="fab" onclick="A.showScreen('new')">+ New Article</button>
+</div>
+
+<!-- NEW PROJECT -->
+<div id="s-new" class="screen">
+  <div class="s-head">
+    <div class="hrow">
+      <button class="btn-ghost" onclick="A.showScreen('home');A.refreshHome()">← Back</button>
+      <span class="htitle">New Article</span>
+    </div>
+  </div>
+  <div class="s-body">
+    <div style="max-width:480px;margin:0 auto">
+      <div class="fg">
+        <label class="flabel">Article name</label>
+        <input id="new-name" class="finput" type="text" placeholder="e.g. El Niño Explained">
+      </div>
+      <div class="fg">
+        <label class="flabel">Text file (.docx)</label>
+        <label class="upload-lbl" id="txt-lbl">
+          <span>📄</span><span id="txt-fn">Choose .docx file…</span>
+          <input type="file" accept=".docx" style="display:none" onchange="A.onTxt(this)">
+        </label>
+        <p class="fhint">Word document — each paragraph becomes a reading block</p>
+      </div>
+      <button class="btn btn-p" style="width:100%;justify-content:center" onclick="A.createProject()">
+        Create Project →
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- READER -->
+<div id="s-reader" class="screen">
+  <div class="s-head">
+    <div class="hrow">
+      <button class="btn-ghost" onclick="A.showScreen('home');A.refreshHome()">← Projects</button>
+      <span class="htitle" id="reader-title">Article</span>
+      <button class="btn btn-s btn-sm" onclick="A.openTiming()">⏱ Timings</button>
+    </div>
+    <div class="hrow">
+      <div class="audio-wrap">
+        <button class="abtn" onclick="A.rel(-10)" title="−10s">⏮</button>
+        <button class="abtn play" id="r-play" onclick="A.togglePlay()">▶</button>
+        <button class="abtn" onclick="A.rel(10)" title="+10s">⏭</button>
+        <div class="aprog" id="r-prog" onclick="A.seekClick(event,'r-prog')">
+          <div class="aprog-fill" id="r-fill"></div>
+        </div>
+        <span class="atime" id="r-time">0:00 / 0:00</span>
+        <select class="speed" onchange="A.setSpeed(this.value)">
+          <option value="0.75">0.75×</option>
+          <option value="1" selected>1×</option>
+          <option value="1.25">1.25×</option>
+          <option value="1.5">1.5×</option>
+        </select>
+      </div>
+      <label class="btn btn-s btn-sm" style="cursor:pointer">
+        🎵
+        <input type="file" accept="audio/*" style="display:none" onchange="A.loadAudio(this.files[0])">
+      </label>
+    </div>
+  </div>
+  <div class="s-body">
+    <div class="reader-body">
+      <div id="audio-banner" class="audio-banner" style="display:none">
+        <p id="audio-banner-txt">Load audio file to enable playback.</p>
+        <label class="btn btn-p btn-sm" style="cursor:pointer">
+          Load Audio
+          <input type="file" accept="audio/*" style="display:none" onchange="A.loadAudio(this.files[0])">
+        </label>
+      </div>
+      <div id="reader-content"></div>
+    </div>
+  </div>
+</div>
+
+<!-- TIMING EDITOR -->
+<div id="s-timing" class="screen">
+  <div class="s-head">
+    <div class="hrow">
+      <button class="btn-ghost" onclick="A.showScreen('reader')">← Reader</button>
+      <span class="htitle">Edit Timings</span>
+      <button class="btn btn-p btn-sm" onclick="A.saveTimings()">Save ✓</button>
+    </div>
+    <div class="hrow">
+      <div class="audio-wrap">
+        <button class="abtn" onclick="A.rel(-5)">⏮</button>
+        <button class="abtn play" id="t-play" onclick="A.togglePlay()">▶</button>
+        <button class="abtn" onclick="A.rel(5)">⏭</button>
+        <div class="aprog" id="t-prog" onclick="A.seekClick(event,'t-prog')">
+          <div class="aprog-fill" id="t-fill"></div>
+        </div>
+        <span class="atime" id="t-time">0:00 / 0:00</span>
+      </div>
+      <label class="btn btn-s btn-sm" style="cursor:pointer">
+        🎵 Load
+        <input type="file" accept="audio/*" style="display:none" onchange="A.loadAudio(this.files[0])">
+      </label>
+    </div>
+  </div>
+  <div class="s-body">
+    <div style="max-width:800px;margin:0 auto">
+      <div class="timing-info">
+        Play the audio, find the moment when each paragraph starts, then click <strong>← Now</strong>
+        to capture the time. Or type manually (e.g. <code>1:23</code>).
+      </div>
+      <div id="tcount" class="tcount"></div>
+      <div id="tlist" class="tlist"></div>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS MODAL -->
+<div id="modal-settings" class="overlay" onclick="if(event.target===this)A.closeSettings()">
+  <div class="modal">
+    <h2>⚙️ Settings</h2>
+    <div class="fg">
+      <label class="flabel">Claude API Key</label>
+      <input id="api-key" class="finput" type="password" placeholder="sk-ant-…">
+      <p class="fhint">Stored only in your browser. Used only by the local server to call Anthropic.</p>
+    </div>
+    <div class="flex gap8" style="margin-bottom:20px">
+      <button class="btn btn-p" onclick="A.saveApiKey()">Save Key</button>
+      <button class="btn btn-s" onclick="A.closeSettings()">Cancel</button>
+    </div>
+    <div class="divider"></div>
+    <p style="font-size:14px;font-weight:600;margin-bottom:11px">Projects</p>
+    <div class="flex gap8">
+      <button class="btn btn-s btn-sm" onclick="A.exportProject()">⬇ Export current</button>
+      <label class="btn btn-s btn-sm" style="cursor:pointer">
+        ⬆ Import
+        <input type="file" accept=".json" style="display:none" onchange="A.importProject(this)">
+      </label>
+    </div>
+  </div>
+</div>
+
+<!-- WORD POPUP -->
+<div id="popup">
+  <div class="pop-hdr">
+    <div>
+      <div class="pop-word" id="pop-word"></div>
+      <div class="pop-ipa" id="pop-ipa"></div>
+    </div>
+    <button class="pop-x" onclick="A.closePopup()">×</button>
+  </div>
+  <div class="pop-body" id="pop-body"></div>
+</div>
+
+<script>
+// ── Utils ──────────────────────────────────────────────
+function fmt(s){if(!isFinite(s))return'0:00';const m=Math.floor(s/60),sec=Math.floor(s%60);return`${m}:${sec.toString().padStart(2,'0')}`}
+function parsetime(str){if(!str||!str.trim())return null;str=str.trim();if(str.includes(':')){const[m,s]=str.split(':').map(Number);return m*60+s}const n=parseFloat(str);return isNaN(n)?null:n}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2)}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function parseParagraphs(txt){return txt.split(/\n+/).map(p=>p.trim()).filter(p=>p.length>0).map((text,i)=>({i,text,t:null}))}
+function tokenize(text){return esc(text).replace(/\b([a-zA-Z']{2,})\b/g,'<span class="word">$1</span>')}
+
+// ── IndexedDB ──────────────────────────────────────────
+const DB={
+  _db:null,
+  open(){return new Promise((res,rej)=>{const r=indexedDB.open('ArticleReader',1);r.onupgradeneeded=e=>{const d=e.target.result;if(!d.objectStoreNames.contains('projects'))d.createObjectStore('projects',{keyPath:'id'})};r.onsuccess=e=>{this._db=e.target.result;res()};r.onerror=()=>rej(r.error)})},
+  _s(m){return this._db.transaction('projects',m).objectStore('projects')},
+  all(){return new Promise((res,rej)=>{const r=this._s('readonly').getAll();r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})},
+  get(id){return new Promise((res,rej)=>{const r=this._s('readonly').get(id);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})},
+  put(p){return new Promise((res,rej)=>{const r=this._s('readwrite').put(p);r.onsuccess=()=>res();r.onerror=()=>rej(r.error)})},
+  del(id){return new Promise((res,rej)=>{const r=this._s('readwrite').delete(id);r.onsuccess=()=>res();r.onerror=()=>rej(r.error)})}
+};
+
+// ── App ────────────────────────────────────────────────
+const A={
+  proj:null,       // current project
+  _au:new Audio(), // single audio element
+  _pendingTxt:null,
+  _activePara:-1,
+
+  async init(){
+    await DB.open();
+    this._setupAudio();
+    await this.refreshHome();
+    // word click via delegation
+    document.getElementById('reader-content').addEventListener('click',e=>{
+      if(e.target.classList.contains('word')) this._wordClick(e.target);
+    });
+    document.addEventListener('keydown',e=>{
+      if(e.key==='Escape'){this.closePopup();this.closeSettings()}
+      if(e.code==='Space'&&e.target.tagName!=='INPUT'&&e.target.tagName!=='SELECT'){e.preventDefault();this.togglePlay()}
+    });
+    document.addEventListener('click',e=>{
+      if(!document.getElementById('popup').contains(e.target)&&!e.target.classList.contains('word'))
+        this.closePopup();
+    });
+  },
+
+  // ── Navigation ──
+  showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById('s-'+id).classList.add('active')},
+
+  // ── Home ──
+  async refreshHome(){
+    const all=await DB.all();
+    all.sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+    const c=document.getElementById('proj-list');
+    if(!all.length){c.innerHTML='<div class="empty"><h2>No articles yet</h2><p>Click + New Article to get started.</p></div>';return}
+    c.innerHTML=all.map(p=>`
+      <div class="pcard" onclick="A.openProject('${p.id}')">
+        <div class="pcard-name">${esc(p.name)}</div>
+        <div class="pcard-meta">
+          <span>${p.paras.length} paragraphs</span>
+          <span>${p.paras.filter(x=>x.t!==null).length} timed</span>
+          <span>${new Date(p.updatedAt).toLocaleDateString()}</span>
+        </div>
+        <button class="pcard-del" onclick="A.delProject(event,'${p.id}')">🗑</button>
+      </div>`).join('');
+  },
+  async delProject(e,id){
+    e.stopPropagation();
+    if(!confirm('Delete this project?'))return;
+    await DB.del(id);
+    await this.refreshHome();
+  },
+
+  // ── New Project ──
+  onTxt(input){
+    const file=input.files[0];if(!file)return;
+    const r=new FileReader();
+    r.onload=async e=>{
+      const result=await mammoth.extractRawText({arrayBuffer:e.target.result});
+      this._pendingTxt=result.value;
+      document.getElementById('txt-fn').textContent=file.name;
+      document.getElementById('txt-lbl').classList.add('ok');
+      const n=document.getElementById('new-name');
+      if(!n.value)n.value=file.name.replace(/\.docx$/i,'').replace(/[-_]/g,' ');
+    };
+    r.readAsArrayBuffer(file);
+  },
+  async createProject(){
+    const name=document.getElementById('new-name').value.trim();
+    if(!name)return alert('Enter an article name.');
+    if(!this._pendingTxt)return alert('Upload a .txt file.');
+    const paras=parseParagraphs(this._pendingTxt);
+    if(!paras.length)return alert('No text found in file.');
+    const p={id:uid(),name,paras,wordCache:{},createdAt:Date.now(),updatedAt:Date.now()};
+    await DB.put(p);
+    this._pendingTxt=null;
+    document.getElementById('new-name').value='';
+    document.getElementById('txt-fn').textContent='Choose .txt file…';
+    document.getElementById('txt-lbl').classList.remove('ok');
+    await this.openProject(p.id);
+  },
+
+  // ── Open Project ──
+  async openProject(id){
+    const p=await DB.get(id);if(!p)return alert('Project not found.');
+    this.proj=p;
+    this._renderReader();
+    this.showScreen('reader');
+    p.updatedAt=Date.now();await DB.put(p);
+  },
+
+  _renderReader(){
+    const p=this.proj;
+    document.getElementById('reader-title').textContent=p.name;
+    const hasAudio=this._au.src&&this._au.src!==location.href;
+    const banner=document.getElementById('audio-banner');
+    banner.style.display=hasAudio?'none':'flex';
+    if(!hasAudio&&p.audioFile){
+      document.getElementById('audio-banner-txt').textContent=`Load "${p.audioFile}" to enable playback.`;
+    }
+    document.getElementById('reader-content').innerHTML=
+      p.paras.map((para,i)=>`
+        <div class="para-wrap" id="para-${i}" data-i="${i}">
+          <p class="para-text">${tokenize(para.text)}</p>
+        </div>`).join('');
+    this._activePara=-1;
+  },
+
+  // ── Audio ──
+  _setupAudio(){
+    const au=this._au;
+    au.addEventListener('timeupdate',()=>{this._updateAudioUI();this._sync()});
+    au.addEventListener('play',()=>{document.getElementById('r-play').textContent='⏸';document.getElementById('t-play').textContent='⏸'});
+    au.addEventListener('pause',()=>{document.getElementById('r-play').textContent='▶';document.getElementById('t-play').textContent='▶'});
+    au.addEventListener('ended',()=>{document.getElementById('r-play').textContent='▶';document.getElementById('t-play').textContent='▶'});
+  },
+  _updateAudioUI(){
+    const au=this._au;
+    const s=`${fmt(au.currentTime)} / ${fmt(au.duration)}`;
+    const pct=au.duration?`${(au.currentTime/au.duration)*100}%`:'0%';
+    document.getElementById('r-time').textContent=s;
+    document.getElementById('t-time').textContent=s;
+    document.getElementById('r-fill').style.width=pct;
+    document.getElementById('t-fill').style.width=pct;
+  },
+  loadAudio(file){
+    if(!file)return;
+    if(this._au.src&&this._au.src.startsWith('blob:'))URL.revokeObjectURL(this._au.src);
+    this._au.src=URL.createObjectURL(file);
+    this._au.load();
+    document.getElementById('audio-banner').style.display='none';
+    this._updateAudioUI();
+    if(this.proj){this.proj.audioFile=file.name;DB.put(this.proj)}
+  },
+  togglePlay(){this._au.paused?this._au.play():this._au.pause()},
+  rel(d){this._au.currentTime=Math.max(0,this._au.currentTime+d)},
+  setSpeed(v){this._au.playbackRate=parseFloat(v)},
+  seekClick(e,progId){
+    const el=document.getElementById(progId);
+    const r=el.getBoundingClientRect();
+    if(this._au.duration)this._au.currentTime=((e.clientX-r.left)/r.width)*this._au.duration;
+  },
+
+  // ── Highlight sync ──
+  _sync(){
+    if(!this.proj)return;
+    const t=this._au.currentTime;
+    const timed=this.proj.paras.map((p,i)=>({...p,i})).filter(p=>p.t!==null).sort((a,b)=>a.t-b.t);
+    let active=-1;
+    for(const p of timed){if(p.t<=t)active=p.i;else break}
+    if(active===this._activePara)return;
+    this._activePara=active;
+    document.querySelectorAll('.para-wrap').forEach((el,i)=>el.classList.toggle('active',i===active));
+    if(active>=0&&!this._au.paused){
+      const el=document.getElementById('para-'+active);
+      if(el){const r=el.getBoundingClientRect();if(r.top<130||r.bottom>window.innerHeight-20)el.scrollIntoView({behavior:'smooth',block:'center'})}
+    }
+  },
+
+  // ── Timing editor ──
+  openTiming(){
+    this.showScreen('timing');
+    this._renderTimingList();
+  },
+  _renderTimingList(){
+    const p=this.proj;if(!p)return;
+    const timed=p.paras.filter(x=>x.t!==null).length;
+    document.getElementById('tcount').textContent=`${timed} of ${p.paras.length} paragraphs timed`;
+    document.getElementById('tlist').innerHTML=p.paras.map((para,i)=>`
+      <div class="trow">
+        <span class="tnum">${i+1}</span>
+        <span class="tprev">${esc(para.text.slice(0,75))}${para.text.length>75?'…':''}</span>
+        <input class="tinput${para.t!==null?' ok':''}" id="ti-${i}" type="text"
+          placeholder="0:00" value="${para.t!==null?fmt(para.t):''}"
+          oninput="A._onTInput(this,${i})">
+        <button class="bnow" onclick="A.captureNow(${i})">← Now</button>
+      </div>`).join('');
+  },
+  captureNow(i){
+    const t=this._au.currentTime;
+    const input=document.getElementById('ti-'+i);
+    input.value=fmt(t);input.classList.add('ok');
+    this.proj.paras[i].t=t;
+    const timed=this.proj.paras.filter(x=>x.t!==null).length;
+    document.getElementById('tcount').textContent=`${timed} of ${this.proj.paras.length} paragraphs timed`;
+  },
+  _onTInput(input,i){
+    const v=parsetime(input.value);
+    this.proj.paras[i].t=v;
+    input.classList.toggle('ok',v!==null);
+  },
+  async saveTimings(){
+    // read any manually typed values
+    this.proj.paras.forEach((_,i)=>{
+      const input=document.getElementById('ti-'+i);
+      if(input)this.proj.paras[i].t=parsetime(input.value);
+    });
+    this.proj.updatedAt=Date.now();
+    await DB.put(this.proj);
+    this.showScreen('reader');
+    this._renderReader();
+    this._toast('Timings saved ✓');
+  },
+
+  // ── Word popup ──
+  _wordClick(el){
+    const word=el.textContent.toLowerCase().replace(/['']/g,"'");
+    const wrap=el.closest('.para-wrap');
+    const ctx=this.proj?.paras[wrap?parseInt(wrap.dataset.i):0]?.text||'';
+    const popup=document.getElementById('popup');
+    document.getElementById('pop-word').textContent=el.textContent;
+    document.getElementById('pop-ipa').textContent='';
+    document.getElementById('pop-body').innerHTML='<div class="pop-load"><div class="spin"></div> Looking up…</div>';
+    // position
+    const rect=el.getBoundingClientRect();
+    const pw=315,ph=260;
+    let top=rect.bottom+8;
+    if(top+ph>window.innerHeight-8)top=rect.top-ph-8;
+    top=Math.max(8,top);
+    let left=rect.left;
+    left=Math.max(8,Math.min(left,window.innerWidth-pw-8));
+    popup.style.top=top+'px';popup.style.left=left+'px';
+    popup.classList.add('on');
+    // cache?
+    const cached=this.proj?.wordCache?.[word];
+    if(cached){this._renderPopup(cached);return}
+    this._lookup(word,ctx);
+  },
+  async _lookup(word,ctx){
+    const key=localStorage.getItem('claude_api_key')||'';
+    if(!key){
+      document.getElementById('pop-body').innerHTML='<div class="pop-err">No API key set.<br>Go to ⚙️ Settings to add your Claude API key.</div>';
+      return;
+    }
+    try{
+      const res=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({apiKey:key,word,context:ctx})});
+      const data=await res.json();
+      if(data.error)throw new Error(data.error);
+      if(this.proj){this.proj.wordCache[word]=data;DB.put(this.proj)}
+      this._renderPopup(data);
+    }catch(e){
+      document.getElementById('pop-body').innerHTML=`<div class="pop-err">${esc(e.message)}<br><button class="btn btn-s btn-sm" style="margin-top:8px" onclick="A._lookup('${esc(word)}','')">Retry</button></div>`;
+    }
+  },
+  _renderPopup(d){
+    document.getElementById('pop-ipa').textContent=d.ipa||'';
+    document.getElementById('pop-body').innerHTML=`
+      <div class="psec"><div class="plabel">Translation · Russian</div><div class="ptrans">${esc(d.translation||'—')}</div></div>
+      <div class="psec"><div class="plabel">Synonyms</div><div class="psyns">${(d.synonyms||[]).map(s=>`<span class="chip">${esc(s)}</span>`).join('')}</div></div>
+      <div class="psec"><div class="plabel">Collocations</div><div class="pcolls">${(d.collocations||[]).map(c=>`<div class="coll">${esc(c)}</div>`).join('')}</div></div>`;
+  },
+  closePopup(){document.getElementById('popup').classList.remove('on')},
+
+  // ── Settings ──
+  openSettings(){document.getElementById('api-key').value=localStorage.getItem('claude_api_key')||'';document.getElementById('modal-settings').classList.add('on')},
+  closeSettings(){document.getElementById('modal-settings').classList.remove('on')},
+  saveApiKey(){localStorage.setItem('claude_api_key',document.getElementById('api-key').value.trim());this.closeSettings();this._toast('API key saved ✓')},
+
+  // ── Export / Import ──
+  exportProject(){
+    if(!this.proj)return alert('No project open.');
+    const json=JSON.stringify(this.proj,null,2);
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([json],{type:'application/json'}));
+    a.download=this.proj.name.replace(/\s+/g,'_')+'_project.json';
+    a.click();
+  },
+  importProject(input){
+    const file=input.files[0];if(!file)return;
+    const r=new FileReader();
+    r.onload=async e=>{
+      try{
+        const p=JSON.parse(e.target.result);
+        if(!p.id||!p.name||!p.paras)throw new Error('Invalid project file');
+        await DB.put(p);
+        this.closeSettings();
+        await this.refreshHome();
+        this.showScreen('home');
+        this._toast('Project imported ✓');
+      }catch(err){alert('Import failed: '+err.message)}
+      input.value='';
+    };
+    r.readAsText(file);
+  },
+
+  // ── Toast ──
+  _toast(msg){
+    const t=document.createElement('div');
+    t.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1c1c1e;color:#fff;padding:9px 18px;border-radius:50px;font-size:14px;z-index:9999;pointer-events:none;animation:fadeUp .3s ease';
+    t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2200);
+  }
+};
+
+A.init().catch(console.error);
+</script>
+</body>
+</html>
