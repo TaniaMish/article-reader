@@ -579,7 +579,7 @@ const A={
       return;
     }
     try{
-      const res=await fetch('https://web-production-c0e2a.up.railway.app/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({apiKey:key,word,context:ctx})});
+      const res=await fetch('https://article-reader-8qgq.onrender.com/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({apiKey:key,word,context:ctx})});
       const data=await res.json();
       if(data.error)throw new Error(data.error);
       if(this.proj){this.proj.wordCache[word]=data;DB.put(this.proj)}
